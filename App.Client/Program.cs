@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -59,10 +60,12 @@ namespace App.Client
 
 
                         Console.WriteLine(fullServerReply);
-
                         Thread.Sleep(2000); // Sleep for demo purpuses!!!
                         //Console.WriteLine("Press enter to read next message...");
                         //Console.ReadLine();
+
+                        const char StartOfHeading = '\x0001'; // SOH ascii code is 1 or 01//
+                        ParseMessages(fullServerReply, StartOfHeading);
 
                     }
                 }
@@ -93,6 +96,7 @@ namespace App.Client
 
                 #endregion
 
+
             }
             catch (Exception ex)
             {
@@ -104,5 +108,138 @@ namespace App.Client
                 Console.ReadLine();
             }
         }
+
+
+        static void ParseMessages(string fixString, char delimiter)
+        {
+            var parts = fixString.Split(delimiter);
+
+            var list = new List<TagBase>();
+
+            foreach (var element in parts)
+            {
+                Console.WriteLine(element);
+                var tagParts = element.Split('=');
+
+                var tagName = tagParts[0];
+                //var tagWithoutSoh = tagName.Replace("\u0001", "");
+
+                if (!string.IsNullOrEmpty(tagName))
+                {
+                    switch (Convert.ToInt32(tagName))
+                    {
+                        case (int)Tags.BeginString:
+                            list.Add(new BeginTag() { Value = tagParts[1] });
+                            break;
+                        case (int)Tags.BodyLength:
+                            list.Add(new BodyLength() { Value = tagParts[1] });
+                            break;
+                    }
+                }
+            }
+
+            Console.WriteLine("Recognized Tags ....");
+
+            foreach (var element in list)
+            {
+                Console.WriteLine(string.Format("Tag={0} TagDescr={1} Value={2} ValueDescr={3}",
+                    element.Tag, element.Tag, element.Value, element.ValueDescription));
+            }
+        }
+    }
+
+
+    [Serializable]
+    public abstract class TagBase
+    {
+        public T ShallowCopy<T>() where T : TagBase
+        {
+            return (T)(MemberwiseClone());
+        }
+
+
+        public abstract string Tag { get; }
+        public abstract string TagDescription { get; }
+        public abstract string Value { get; set; }
+        public abstract string ValueDescription { get; }
+
+    }
+
+    public enum Tags
+    {
+        BeginString = 8,
+        BodyLength = 9
+    }
+
+    [Serializable]
+    public class BeginTag : TagBase
+    {
+
+        #region implemented abstract members of Expression
+
+        public override string Tag
+        {
+            get
+            {
+                return Tags.BeginString.ToString();
+            }
+        }
+
+        public override string TagDescription
+        {
+            get
+            {
+                return "BeginString";
+            }
+
+        }
+
+        public override string Value { get; set; }
+
+        public override string ValueDescription
+        {
+            get
+            {
+                return "Begin of message";
+            }
+        }
+
+        #endregion
+    }
+
+    [Serializable]
+    public class BodyLength : TagBase
+    {
+
+        #region implemented abstract members of Expression
+
+        public override string Tag
+        {
+            get
+            {
+                return Tags.BodyLength.ToString();
+            }
+        }
+
+        public override string TagDescription
+        {
+            get
+            {
+                return "BodyLength";
+            }
+
+        }
+
+        public override string Value { get; set; }
+
+        public override string ValueDescription
+        {
+            get
+            {
+                return "Body Length";
+            }
+        }
+
+        #endregion
     }
 }
